@@ -157,58 +157,87 @@
     };
 
     const BrandLogo = ({ isDark, className = "h-9 sm:h-11", showTagline = false }) => {
-      // Artboard 1 (Цагаан/Light горимд: "EVOLUTION" хар/бараан)
-      // Artboard 2 (Бараан/Dark горимд: "EVOLUTION" цагаан)
-      const currentSrc = isDark ? "Artboard 2.jpg" : "Artboard 1.jpg";
+      // GitHub дээрх яг бодит нэршил: Artboard 1.png ба Artboard 2.png
+      const darkCandidates = [
+        "Artboard 2.png",
+        "./Artboard 2.png",
+        "Artboard%202.png",
+        "./Artboard%202.png",
+        "artboard 2.png",
+        "Artboard-2.png",
+        "Artboard 2.jpg"
+      ];
+
+      const lightCandidates = [
+        "Artboard 1.png",
+        "./Artboard 1.png",
+        "Artboard%201.png",
+        "./Artboard%201.png",
+        "artboard 1.png",
+        "Artboard-1.png",
+        "Artboard 1.jpg"
+      ];
+
+      const candidates = isDark ? darkCandidates : lightCandidates;
+      const [srcIndex, setSrcIndex] = useState(0);
+      const [imgFailed, setImgFailed] = useState(false);
+
+      useEffect(() => {
+        setSrcIndex(0);
+        setImgFailed(false);
+      }, [isDark]);
+
+      const handleImgError = () => {
+        if (srcIndex + 1 < candidates.length) {
+          setSrcIndex(prev => prev + 1);
+        } else {
+          setImgFailed(true);
+        }
+      };
 
       return (
         <div className="flex items-center">
-          {/* Зураг байвал Artboard 1, 2-оос уншина, хэрэв зураг ачаалагдаагүй бол SVG вектор лого автоматаар орлоно */}
-          <img 
-            src={currentSrc} 
-            alt="Evolution Holding Logo" 
-            className={`${className} object-contain`}
-            onError={(e) => {
-              // Хэрэв локал файлын зам өөр байвал вектор бүтцийг гаргана
-              e.currentTarget.style.display = 'none';
-              const fallbackEl = e.currentTarget.nextElementSibling;
-              if (fallbackEl) fallbackEl.style.display = 'flex';
-            }}
-          />
-          
-          {/* Fallback Vector: Таны илгээсэн логоны гал дөл болон бичвэрийн яг ижил өнгөт хувилбар */}
-          <div className="hidden items-center gap-2.5 sm:gap-3 select-none">
-            <svg className="w-8 h-10 sm:w-9 sm:h-11 shrink-0" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="flameLeft" x1="0%" y1="100%" x2="50%" y2="0%">
-                  <stop offset="0%" stopColor="#10b981" />
-                  <stop offset="50%" stopColor="#06b6d4" />
-                  <stop offset="100%" stopColor="#3b82f6" />
-                </linearGradient>
-                <linearGradient id="flameRight" x1="100%" y1="100%" x2="0%" y2="0%">
-                  <stop offset="0%" stopColor="#f59e0b" />
-                  <stop offset="50%" stopColor="#f97316" />
-                  <stop offset="100%" stopColor="#ef4444" />
-                </linearGradient>
-              </defs>
-              {/* Flame loop path */}
-              <path d="M50 115 C20 115 5 85 18 50 C26 30 42 20 42 8 C42 20 54 32 58 48 C62 38 64 22 55 2 C80 18 95 55 82 85 C74 105 65 115 50 115 Z" fill="url(#flameRight)" />
-              <path d="M50 115 C28 115 12 90 20 62 C26 78 38 88 48 88 C38 72 35 52 42 35 C30 50 24 72 32 94 C38 106 46 112 50 115 Z" fill="url(#flameLeft)" />
-            </svg>
-            <div className="flex flex-col leading-none">
-              <span className={`text-base sm:text-xl font-extrabold tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                EVOLUTION
-              </span>
-              <span className="text-sm sm:text-lg font-black tracking-wider text-emerald-400">
-                HOLDING
-              </span>
-              {showTagline && (
-                <span className="text-[9px] sm:text-[10px] tracking-wide text-emerald-300/90 font-medium mt-0.5">
-                  Collateral Lending Services
+          {!imgFailed ? (
+            <img 
+              src={candidates[srcIndex]} 
+              alt="Evolution Holding Logo" 
+              className={`${className} object-contain transition-opacity duration-200`}
+              onError={handleImgError}
+            />
+          ) : (
+            /* Баталгаат Вектор SVG лого (хэрэв зураг ачаалагдаагүй үед) */
+            <div className="flex items-center gap-2.5 sm:gap-3 select-none">
+              <svg className="w-8 h-10 sm:w-9 sm:h-11 shrink-0" viewBox="0 0 100 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="flameLeft" x1="0%" y1="100%" x2="50%" y2="0%">
+                    <stop offset="0%" stopColor="#10b981" />
+                    <stop offset="50%" stopColor="#06b6d4" />
+                    <stop offset="100%" stopColor="#3b82f6" />
+                  </linearGradient>
+                  <linearGradient id="flameRight" x1="100%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stopColor="#f59e0b" />
+                    <stop offset="50%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="#ef4444" />
+                  </linearGradient>
+                </defs>
+                <path d="M50 115 C20 115 5 85 18 50 C26 30 42 20 42 8 C42 20 54 32 58 48 C62 38 64 22 55 2 C80 18 95 55 82 85 C74 105 65 115 50 115 Z" fill="url(#flameRight)" />
+                <path d="M50 115 C28 115 12 90 20 62 C26 78 38 88 48 88 C38 72 35 52 42 35 C30 50 24 72 32 94 C38 106 46 112 50 115 Z" fill="url(#flameLeft)" />
+              </svg>
+              <div className="flex flex-col leading-none">
+                <span className={`text-base sm:text-xl font-extrabold tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  EVOLUTION
                 </span>
-              )}
+                <span className="text-sm sm:text-lg font-black tracking-wider text-emerald-400">
+                  HOLDING
+                </span>
+                {showTagline && (
+                  <span className="text-[9px] sm:text-[10px] tracking-wide text-emerald-300/90 font-medium mt-0.5">
+                    Collateral Lending Services
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       );
     };
