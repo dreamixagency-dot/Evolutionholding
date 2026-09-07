@@ -182,38 +182,58 @@
           if (!amount || !months || !currentConfig.rate) return [];
           const sched = [];
           let balance = amount;
-          const principalPayment = amount / months; 
-          const annualRate = currentConfig.rate * 12; 
-          let currentDate = new Date();
+          const r = currentConfig.rate; // Сарын нэрлэсэн хүү (3.9%)
+          const n = months;
+          const annualRate = r * 12; // Жилийн хүү (46.8%)
+          
+          // Банкны 365 хоногийн хуанлид суурилсан жигнэсэн сарын хүү (365 хоногийн дундаж хоногоор тэгшитгэх)
+          // 365 хоногтой жилд 1 сарын дундаж хоног = 365 / 12 = 30.4166667
+          const avgDaysInMonth = 365 / 12;
+          const bankMonthlyRate = (annualRate / 365) * avgDaysInMonth;
+
+          // Банкны бодит тэнцүү төлбөрийн стандарт үр дүн
+          const fixedMonthlyPayment = (amount * bankMonthlyRate * Math.pow(1 + bankMonthlyRate, n)) / (Math.pow(1 + bankMonthlyRate, n) - 1);
+
+          const startDate = new Date();
+          const anchorDay = startDate.getDate();
+          let previousDate = new Date(startDate);
           
           for (let i = 1; i <= months; i++) {
-            const nextDate = new Date(currentDate);
-            nextDate.setMonth(currentDate.getMonth() + 1);
+            const nextDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, anchorDay);
             
-            if (currentDate.getDate() !== nextDate.getDate()) {
-                nextDate.setDate(0); 
+            if (nextDate.getDate() !== anchorDay) {
+              nextDate.setDate(0);
             }
 
-            const days = Math.round((nextDate - currentDate) / (1000 * 60 * 60 * 24));
+            const days = Math.round((nextDate - previousDate) / (1000 * 60 * 60 * 24));
+            // Банкны өдрийн хүүгийн томьёо: Үлдэгдэл * Жилийн хүү / 365 * Хоног
             const interestPayment = (balance * annualRate) / 365 * days;
             
-            let actualPrincipal = principalPayment;
-            if (i === months) actualPrincipal = balance; 
+            let principalPayment;
+            let totalPayment;
 
-            const totalPayment = actualPrincipal + interestPayment;
-            balance = balance - actualPrincipal;
+            if (i === months) {
+              // Сүүлийн сард үлдэгдлийг бүрэн хаана
+              principalPayment = balance;
+              totalPayment = principalPayment + interestPayment;
+              balance = 0;
+            } else {
+              principalPayment = fixedMonthlyPayment - interestPayment;
+              totalPayment = fixedMonthlyPayment;
+              balance = balance - principalPayment;
+            }
 
             sched.push({
               no: i,
               date: nextDate.toISOString().split('T')[0],
               days: days,
+              principal: Math.max(0, principalPayment),
               interest: interestPayment,
-              principal: actualPrincipal,
               total: totalPayment,
               balance: Math.max(0, balance)
             });
 
-            currentDate = nextDate;
+            previousDate = nextDate;
           }
           return sched;
         };
@@ -221,7 +241,7 @@
         setScheduleData(generateSchedule());
       }, [amount, months, currentConfig.rate]);
 
-      const firstMonthPayment = scheduleData.length > 0 ? scheduleData[0].total : 0;
+      const monthlyPayment = scheduleData.length > 0 ? scheduleData[0].total : 0;
       const totalPayment = scheduleData.reduce((sum, row) => sum + row.total, 0);
 
       const formatCurrency = (val) => new Intl.NumberFormat('mn-MN').format(Math.round(val)) + ' ₮';
@@ -408,9 +428,9 @@
                     <h3 className={`text-xl font-medium mb-8 text-center transition-colors ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Тооцооллын үр дүн</h3>
                     
                     <div className="text-center mb-6">
-                      <p className="text-sm text-emerald-500 font-medium mb-2">Эхний сард төлөх дүн (ойролцоогоор)</p>
+                      <p className="text-sm text-emerald-500 font-medium mb-2">Сард төлөх тэнцүү төлбөр</p>
                       <div className={`text-5xl md:text-6xl font-black tracking-tight transition-colors ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                        {formatCurrency(firstMonthPayment)}
+                        {formatCurrency(monthlyPayment)}
                       </div>
                     </div>
 
@@ -434,7 +454,7 @@
                     </div>
 
                     <p className="text-xs text-slate-500 text-center mb-6 leading-relaxed">
-                      *Энэхүү тооцоолол нь баримжаа бөгөөд зээлийг <strong>Үндсэн төлбөр тэнцүү</strong> аргаар тооцсон. Гэрээ байгуулах үед эцсийн хуваарь гарна.
+                      *Энэхүү тооцоолол нь баримжаа бөгөөд зээлийг <strong>Тэнцүү төлбөрт (Аннуитет)</strong> аргаар тооцсон. Гэрээ байгуулах үед эцсийн хуваарь гарна.
                     </p>
 
                     <button onClick={onOpenModal} className="block text-center w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] text-lg">
@@ -480,7 +500,7 @@
                     <div className="mb-6 text-center">
                       <h2 className="text-xl sm:text-2xl font-bold mb-2 uppercase" style={{ color: '#0f172a' }}>ЗЭЭЛИЙН ЭРГЭН ТӨЛӨХ ХУВААРЬ</h2>
                       <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto">
-                        ҮНДСЭН ТӨЛБӨР ТЭНЦҮҮ аргаар бодогдсон урьдчилсан тооцоолол.
+                        ТЭНЦҮҮ ТӨЛБӨРТ (АННУИТЕТ) аргаар бодогдсон урьдчилсан тооцоолол.
                       </p>
                     </div>
                     
@@ -488,23 +508,23 @@
                       <table className="w-full text-xs sm:text-[13px] border-collapse min-w-[800px] bg-white" style={{ borderCollapse: 'collapse', width: '100%' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#ecfdf5', color: '#065f46' }}>
+                            <th className="border border-emerald-200 p-2 sm:p-3 text-center font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>САР</th>
                             <th className="border border-emerald-200 p-2 sm:p-3 text-left font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ОГНОО</th>
-                            <th className="border border-emerald-200 p-2 sm:p-3 text-center font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ДУГААР</th>
-                            <th className="border border-emerald-200 p-2 sm:p-3 text-center font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ХҮҮ ТООЦСОН ХОНОГ</th>
-                            <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ЗЭЭЛИЙН ХҮҮ</th>
+                            <th className="border border-emerald-200 p-2 sm:p-3 text-center font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ХОНОГ</th>
                             <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ҮНДСЭН ТӨЛБӨР</th>
-                            <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>НИЙТ ТӨЛБӨР</th>
-                            <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ЗЭЭЛИЙН ҮЛДЭГДЭЛ</th>
+                            <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ХҮҮГИЙН ТӨЛБӨР</th>
+                            <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ТЭНЦҮҮ ТӨЛБӨР</th>
+                            <th className="border border-emerald-200 p-2 sm:p-3 text-right font-bold" style={{ border: '1px solid #a7f3d0', padding: '8px' }}>ҮНДСЭН ҮЛДЭГДЭЛ</th>
                           </tr>
                         </thead>
                         <tbody>
                           {scheduleData.map((row) => (
                             <tr key={row.no} className="hover:bg-slate-50 transition-colors text-slate-800">
-                              <td className="border border-slate-200 p-2 sm:p-3 text-left whitespace-nowrap font-medium" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{row.date}</td>
                               <td className="border border-slate-200 p-2 sm:p-3 text-center font-bold" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{row.no}</td>
+                              <td className="border border-slate-200 p-2 sm:p-3 text-left whitespace-nowrap font-medium" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{row.date}</td>
                               <td className="border border-slate-200 p-2 sm:p-3 text-center" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{row.days}</td>
-                              <td className="border border-slate-200 p-2 sm:p-3 text-right font-medium text-slate-600" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{formatDecimalCurrency(row.interest)}</td>
                               <td className="border border-slate-200 p-2 sm:p-3 text-right font-medium text-emerald-700" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{formatDecimalCurrency(row.principal)}</td>
+                              <td className="border border-slate-200 p-2 sm:p-3 text-right font-medium text-slate-600" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{formatDecimalCurrency(row.interest)}</td>
                               <td className="border border-slate-200 p-2 sm:p-3 text-right font-bold text-slate-900" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{formatDecimalCurrency(row.total)}</td>
                               <td className="border border-slate-200 p-2 sm:p-3 text-right font-medium text-slate-500" style={{ border: '1px solid #e2e8f0', padding: '8px' }}>{formatDecimalCurrency(row.balance)}</td>
                             </tr>
@@ -513,8 +533,8 @@
                         <tfoot style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold' }}>
                           <tr>
                             <td colSpan="3" className="border border-slate-300 p-2 sm:p-3 text-right" style={{ border: '1px solid #cbd5e1', padding: '8px' }}>НИЙТ ДҮН:</td>
-                            <td className="border border-slate-300 p-2 sm:p-3 text-right" style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDecimalCurrency(scheduleData.reduce((acc, row) => acc + row.interest, 0))}</td>
                             <td className="border border-slate-300 p-2 sm:p-3 text-right text-emerald-700" style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDecimalCurrency(scheduleData.reduce((acc, row) => acc + row.principal, 0))}</td>
+                            <td className="border border-slate-300 p-2 sm:p-3 text-right" style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDecimalCurrency(scheduleData.reduce((acc, row) => acc + row.interest, 0))}</td>
                             <td className="border border-slate-300 p-2 sm:p-3 text-right text-slate-900" style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDecimalCurrency(scheduleData.reduce((acc, row) => acc + row.total, 0))}</td>
                             <td className="border border-slate-300 p-2 sm:p-3 text-right" style={{ border: '1px solid #cbd5e1', padding: '8px' }}>-</td>
                           </tr>
